@@ -1,6 +1,8 @@
 #define _POSIX_C_SOURCE 200809L
 #include <assert.h>
 #include <drm_fourcc.h>
+#include <limits.h>
+#include <float.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -506,6 +508,7 @@ static void render_titlebar_text_texture(struct sway_output *output,
 
 	// We must use a non-nil cairo_t for cairo_set_font_options to work.
 	// Therefore, we cannot use cairo_create(NULL).
+#ifdef HAVE_FONTS
 	cairo_surface_t *dummy_surface = cairo_image_surface_create(
 			CAIRO_FORMAT_ARGB32, 0, 0);
 	cairo_t *c = cairo_create(dummy_surface);
@@ -524,6 +527,7 @@ static void render_titlebar_text_texture(struct sway_output *output,
 			config->pango_markup, "%s", text);
 	cairo_surface_destroy(dummy_surface);
 	cairo_destroy(c);
+#endif
 
 	if (width == 0 || height == 0) {
 		return;
@@ -533,6 +537,7 @@ static void render_titlebar_text_texture(struct sway_output *output,
 		height = config->font_height * scale;
 	}
 
+#ifdef HAVE_FONTS
 	cairo_surface_t *surface = cairo_image_surface_create(
 			CAIRO_FORMAT_ARGB32, width, height);
 	cairo_status_t status = cairo_surface_status(surface);
@@ -565,6 +570,7 @@ static void render_titlebar_text_texture(struct sway_output *output,
 	cairo_surface_destroy(surface);
 	g_object_unref(pango);
 	cairo_destroy(cairo);
+#endif
 }
 
 static void update_title_texture(struct sway_container *con,
@@ -597,6 +603,25 @@ void container_update_title_textures(struct sway_container *container) {
 	update_title_texture(container, &container->title_focused_tab_title,
 			&config->border_colors.focused_tab_title);
 	container_damage_whole(container);
+}
+
+void container_calculate_title_height(struct sway_container *container) {
+#ifdef HAVE_FONTS
+	if (!container->formatted_title) {
+#endif
+		container->title_height = 0;
+		return;
+#ifdef HAVE_FONTS
+	}
+	cairo_t *cairo = cairo_create(NULL);
+	int height;
+	int baseline;
+	get_text_size(cairo, config->font, NULL, &height, &baseline, 1,
+			config->pango_markup, "%s", container->formatted_title);
+	cairo_destroy(cairo);
+	container->title_height = height;
+	container->title_baseline = baseline;
+#endif
 }
 
 /**
@@ -1451,7 +1476,7 @@ void container_insert_child(struct sway_container *parent,
 	if (child->pending.workspace) {
 		container_detach(child);
 	}
-	list_insert(parent->pending.children, i, child);
+	sway_list_insert(parent->pending.children, i, child);
 	child->pending.parent = parent;
 	child->pending.workspace = parent->pending.workspace;
 	container_for_each_child(child, set_workspace, NULL);
@@ -1466,7 +1491,7 @@ void container_add_sibling(struct sway_container *fixed,
 	}
 	list_t *siblings = container_get_siblings(fixed);
 	int index = list_find(siblings, fixed);
-	list_insert(siblings, index + after, active);
+	sway_list_insert(siblings, index + after, active);
 	active->pending.parent = fixed->pending.parent;
 	active->pending.workspace = fixed->pending.workspace;
 	container_for_each_child(active, set_workspace, NULL);
@@ -1714,7 +1739,44 @@ static void update_marks_texture(struct sway_container *con,
 
 	render_titlebar_text_texture(output, con, texture, class, false, buffer);
 
+#ifdef HAVE_FONTS
+	cairo_t *c = cairo_create(NULL);
+	get_text_size(c, config->font, &width, NULL, NULL, scale, false,
+			"%s", buffer);
+	cairo_destroy(c);
+#endif
+
+	if (width == 0 || height == 0) {
+		return;
+	}
+
+#ifdef HAVE_FONTS
+	cairo_surface_t *surface = cairo_image_surface_create(
+			CAIRO_FORMAT_ARGB32, width, height);
+	cairo_t *cairo = cairo_create(surface);
+	cairo_set_source_rgba(cairo, class->background[0], class->background[1],
+			class->background[2], class->background[3]);
+	cairo_paint(cairo);
+	PangoContext *pango = pango_cairo_create_context(cairo);
+	cairo_set_antialias(cairo, CAIRO_ANTIALIAS_BEST);
+	cairo_set_source_rgba(cairo, class->text[0], class->text[1],
+			class->text[2], class->text[3]);
+	cairo_move_to(cairo, 0, 0);
+
+	pango_printf(cairo, config->font, scale, false, "%s", buffer);
+
+	cairo_surface_flush(surface);
+	unsigned char *data = cairo_image_surface_get_data(surface);
+	int stride = cairo_image_surface_get_stride(surface);
+	struct wlr_renderer *renderer = wlr_backend_get_renderer(
+			output->wlr_output->backend);
+	*texture = wlr_texture_from_pixels(
+			renderer, DRM_FORMAT_ARGB8888, stride, width, height, data);
+	cairo_surface_destroy(surface);
+	g_object_unref(pango);
+	cairo_destroy(cairo);
 	free(buffer);
+#endif
 }
 
 void container_update_marks_textures(struct sway_container *con) {

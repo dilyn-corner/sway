@@ -3,8 +3,10 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <strings.h>
+#ifdef HAVE_PCRE
 #define PCRE2_CODE_UNIT_WIDTH 8
 #include <pcre2.h>
+#endif
 #include "sway/criteria.h"
 #include "sway/tree/container.h"
 #include "sway/config.h"
@@ -41,11 +43,12 @@ bool criteria_is_empty(struct criteria *criteria) {
 char *error = NULL;
 
 // Returns error string on failure or NULL otherwise.
+#ifdef HAVE_PCRE
 static bool generate_regex(pcre2_code **regex, char *value) {
-	int errorcode;
-	PCRE2_SIZE offset;
+    int errorcode;
+    PCRE2_SIZE offset;
 
-	*regex = pcre2_compile((PCRE2_SPTR)value, PCRE2_ZERO_TERMINATED, PCRE2_UTF | PCRE2_UCP, &errorcode, &offset, NULL);
+	*regex = pcre2_compile((PCRE2_SPTR)value, PCRE2_ZERO_TERMINATED, PCRE2_UTF | PCRE2_ UCP, &errorcode, &offset, NULL);
 	if (!*regex) {
 		PCRE2_UCHAR buffer[256];
 		pcre2_get_error_message(errorcode, buffer, sizeof(buffer));
@@ -59,6 +62,7 @@ static bool generate_regex(pcre2_code **regex, char *value) {
 
 	return true;
 }
+#endif
 
 static bool pattern_create(struct pattern **pattern, char *value) {
 	*pattern = calloc(1, sizeof(struct pattern));
@@ -69,19 +73,25 @@ static bool pattern_create(struct pattern **pattern, char *value) {
 	if (strcmp(value, "__focused__") == 0) {
 		(*pattern)->match_type = PATTERN_FOCUSED;
 	} else {
+#ifdef HAVE_PCRE
 		(*pattern)->match_type = PATTERN_PCRE2;
 		if (!generate_regex(&(*pattern)->regex, value)) {
+#endif
 			return false;
+#ifdef HAVE_PCRE
 		};
+#endif
 	}
 	return true;
 }
 
 static void pattern_destroy(struct pattern *pattern) {
 	if (pattern) {
+#ifdef HAVE_PCRE
 		if (pattern->regex) {
 			pcre2_code_free(pattern->regex);
 		}
+#endif
 		free(pattern);
 	}
 }
@@ -102,11 +112,13 @@ void criteria_destroy(struct criteria *criteria) {
 	free(criteria);
 }
 
+#ifdef HAVE_PCRE
 static int regex_cmp(const char *item, const pcre2_code *regex) {
 	pcre2_match_data *match_data = pcre2_match_data_create_from_pattern(regex, NULL);
 	int result = pcre2_match(regex, (PCRE2_SPTR)item, strlen(item), 0, 0, match_data, NULL);
 	pcre2_match_data_free(match_data);
 	return result;
+#endif
 }
 
 #if HAVE_XWAYLAND
@@ -157,6 +169,7 @@ static bool has_container_criteria(struct criteria *criteria) {
 
 static bool criteria_matches_container(struct criteria *criteria,
 		struct sway_container *container) {
+#ifdef HAVE_PCRE
 	if (criteria->con_mark) {
 		bool exists = false;
 		struct sway_container *con = container;
@@ -173,11 +186,14 @@ static bool criteria_matches_container(struct criteria *criteria,
 
 	if (criteria->con_id) { // Internal ID
 		if (container->node.id != criteria->con_id) {
+#endif
 			return false;
+#ifdef HAVE_PCRE
 		}
 	}
 
 	return true;
+#endif
 }
 
 static bool criteria_matches_view(struct criteria *criteria,
@@ -199,9 +215,13 @@ static bool criteria_matches_view(struct criteria *criteria,
 			}
 			break;
 		case PATTERN_PCRE2:
+#ifdef HAVE_PCRE
 			if (regex_cmp(title, criteria->title->regex) < 0) {
+#endif
 				return false;
+#ifdef HAVE_PCRE
 			}
+#endif
 			break;
 		}
 	}
@@ -219,9 +239,13 @@ static bool criteria_matches_view(struct criteria *criteria,
 			}
 			break;
 		case PATTERN_PCRE2:
+#ifdef HAVE_PCRE
 			if (regex_cmp(shell, criteria->shell->regex) < 0) {
+#endif
 				return false;
+#ifdef HAVE_PCRE
 			}
+#endif
 			break;
 		}
 	}
@@ -239,9 +263,13 @@ static bool criteria_matches_view(struct criteria *criteria,
 			}
 			break;
 		case PATTERN_PCRE2:
+#ifdef HAVE_PCRE
 			if (regex_cmp(app_id, criteria->app_id->regex) < 0) {
+#endif
 				return false;
+#ifdef HAVE_PCRE
 			}
+#endif
 			break;
 		}
 	}
@@ -271,9 +299,13 @@ static bool criteria_matches_view(struct criteria *criteria,
 			}
 			break;
 		case PATTERN_PCRE2:
+#ifdef HAVE_PCRE
 			if (regex_cmp(class, criteria->class->regex) < 0) {
+#endif
 				return false;
+#ifdef HAVE_PCRE
 			}
+#endif
 			break;
 		}
 	}
@@ -291,9 +323,13 @@ static bool criteria_matches_view(struct criteria *criteria,
 			}
 			break;
 		case PATTERN_PCRE2:
+#ifdef HAVE_PCRE
 			if (regex_cmp(instance, criteria->instance->regex) < 0) {
+#endif
 				return false;
+#ifdef HAVE_PCRE
 			}
+#endif
 			break;
 		}
 	}
@@ -311,9 +347,13 @@ static bool criteria_matches_view(struct criteria *criteria,
 			}
 			break;
 		case PATTERN_PCRE2:
+#ifdef HAVE_PCRE
 			if (regex_cmp(window_role, criteria->window_role->regex) < 0) {
+#endif
 				return false;
+#ifdef HAVE_PCRE
 			}
+#endif
 			break;
 		}
 	}
@@ -370,9 +410,13 @@ static bool criteria_matches_view(struct criteria *criteria,
 			}
 			break;
 		case PATTERN_PCRE2:
+#ifdef HAVE_PCRE
 			if (regex_cmp(ws->name, criteria->workspace->regex) < 0) {
+#endif
 				return false;
+#ifdef HAVE_PCRE
 			}
+#endif
 			break;
 		}
 	}
