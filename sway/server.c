@@ -72,7 +72,7 @@ static void handle_drm_lease_request(struct wl_listener *listener, void *data) {
 	}
 }
 
-bool server_init(struct sway_server *server) {
+bool sway_server_init(struct sway_server *server) {
 	sway_log(SWAY_DEBUG, "Initializing Wayland server");
 
 	server->renderer = wlr_renderer_autocreate(server->backend);
