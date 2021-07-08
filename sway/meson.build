@@ -205,15 +205,11 @@ sway_sources = files(
 )
 
 sway_deps = [
-	cairo,
 	drm,
-	jsonc,
 	libevdev,
 	libinput,
 	libudev,
 	math,
-	pango,
-	pcre2,
 	glesv2,
 	pixman,
 	server_protos,
